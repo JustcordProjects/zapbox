@@ -16,4 +16,7 @@ RUN mkdir -p /opt/zap && \
 
 ENV PATH="/opt/zap:${PATH}"
 
+RUN printf '#!/bin/sh\nfile="$1"; shift; exec "$@" < "$file"\n' > /usr/local/bin/pipe && \
+    chmod +x /usr/local/bin/pipe
+
 WORKDIR /workspace

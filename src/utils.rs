@@ -1,11 +1,20 @@
 use std::io::{self, BufRead, BufReader, Read};
+use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Sender};
 use std::thread;
 
-use crate::models::Message;
+use crate::models::{Message, Status};
 use crate::models::{ExecResult, MessageKind};
 
+pub fn exitcode2status(code: i32) -> Status {
+    match code {
+        0   => Status::Success,
+        137 => Status::MemLimitExceeded,
+        124 => Status::TimeLimitExceeded,
+        _   => Status::UnknownError,
+    }
+}
 
 fn spawn_reader<R: Read + Send + 'static>(stream: R, kind: MessageKind, sender: Sender<Message>) {
     thread::spawn(move || {
@@ -36,11 +45,9 @@ pub fn run_and_capture(cmd: &mut Command) -> io::Result<ExecResult> {
         messages.push(msg);
     }
 
-    child.wait()?;
+    let status = child.wait()?;
     Ok(ExecResult {
         messages: messages,
-        // from what i understand if this is None
-        // then process was terminated by a signal
-        exitcode: child.wait()?.code().unwrap_or(1)
+        exitcode: status.code().unwrap_or(128 + status.signal().unwrap_or(1))
     })
 }

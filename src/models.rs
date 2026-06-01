@@ -27,6 +27,7 @@ pub struct Input {
 #[derive(Debug, Serialize)]
 pub enum Status {
     Success,
+    UnknownError,
     TimeLimitExceeded,
     MemLimitExceeded,
 }

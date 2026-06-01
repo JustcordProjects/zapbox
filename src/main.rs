@@ -46,10 +46,7 @@ fn build_image() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run(arg: &str) -> anyhow::Result<()> {
-    let input: Input = serde_json::from_str(arg)?;
-    dbg!(&input);
-
+fn do_run(input: Input) -> anyhow::Result<Output> {
     let dir = tempfile::tempdir()?;
     let dir = dir.path();
 
@@ -61,24 +58,60 @@ fn run(arg: &str) -> anyhow::Result<()> {
         write!(stdin_file, "{}", stdin)?;
     }
 
-    let mount = format!("{}:/workspace:Z", dir.display());
+    let mount_arg   = format!("{}:/workspace:Z", dir.display());
+    let timeout_arg = format!("{TIMEOUT_SEC}s");
 
     // i wish rust had a spread operator
     let mut compile_args: Vec<&str> = vec![];
     compile_args.extend(["podman", "run", "--rm"]);
     compile_args.extend(LIMIT_FLAGS);
-    compile_args.extend(["-v", &mount]);
+    compile_args.extend(["-v", &mount_arg]);
     compile_args.extend([IMAGE_NAME]);
     compile_args.extend(["zapc", "src.zp", "-o", "exe"]);
 
     let compile_result = run_and_capture(
         Command::new("timeout")
-            .arg(format!("{TIMEOUT_SEC}s"))
+            .arg(&timeout_arg)
             .args(compile_args)
     )?;
 
-    dbg!(compile_result);
+    if compile_result.exitcode != 0 {
+        return Ok(Output {
+            status: exitcode2status(compile_result.exitcode),
+            compiler: compile_result,
+            runtime: None,
+        });
+    }
 
+    let mut runtime_args: Vec<&str> = vec![];
+    runtime_args.extend(["podman", "run", "--rm"]);
+    runtime_args.extend(LIMIT_FLAGS);
+    runtime_args.extend(["-v", &mount_arg]);
+    runtime_args.extend([IMAGE_NAME]);
+
+    if input.stdin.is_some() {
+        runtime_args.extend(["pipe", "stdin.txt", "./exe"]);
+    } else {
+        runtime_args.push("./exe");
+    }
+
+    let mut runtime_cmd = Command::new("timeout");
+    runtime_cmd.arg(&timeout_arg).args(runtime_args);
+
+    let runtime_result = run_and_capture(&mut runtime_cmd)?;
+
+    Ok(Output {
+        status:   exitcode2status(runtime_result.exitcode),
+        compiler: compile_result,
+        runtime:  Some(runtime_result),
+    })
+}
+
+fn run(arg: &str) -> anyhow::Result<()> {
+    let input: Input = serde_json::from_str(arg)?;
+    let output: Output = do_run(input)?;
+    let json = serde_json::to_string(&output)?;
+    println!("{json}");
     Ok(())
 }
 

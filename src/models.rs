@@ -2,8 +2,8 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Debug, Serialize)]
 pub enum MessageKind {
-    Stdout,
-    Stderr,
+    #[serde(rename = "stdout")] Stdout,
+    #[serde(rename = "stderr")] Stderr,
 }
 
 #[derive(Debug, Serialize)]
@@ -26,9 +26,13 @@ pub struct Input {
 
 #[derive(Debug, Serialize)]
 pub enum Status {
+    #[serde(rename = "success")]
     Success,
+    #[serde(rename = "error")]
     UnknownError,
+    #[serde(rename = "time-limit-exceeded")]
     TimeLimitExceeded,
+    #[serde(rename = "mem-limit-exceeded")]
     MemLimitExceeded,
 }
 

@@ -1,6 +1,9 @@
 mod models;
 use models::*;
 
+mod utils;
+use utils::*;
+
 use std::env;
 use std::fs::File;
 
@@ -12,6 +15,12 @@ use std::process::{
 use std::io::Write;
 
 const IMAGE_NAME: &str = "zapbox-image";
+
+const TIMEOUT_SEC: i32 = 5;
+const LIMIT_FLAGS: &[&str] = &[
+    "--net", "none",
+    "--memory", "256m",
+];
 
 fn usage() {
     // did you know that println![] or println!{} is valid in rust?
@@ -51,6 +60,24 @@ fn run(arg: &str) -> anyhow::Result<()> {
         let mut stdin_file = File::create(dir.join("stdin.txt"))?;
         write!(stdin_file, "{}", stdin)?;
     }
+
+    let mount = format!("{}:/workspace:Z", dir.display());
+
+    // i wish rust had a spread operator
+    let mut compile_args: Vec<&str> = vec![];
+    compile_args.extend(["podman", "run", "--rm"]);
+    compile_args.extend(LIMIT_FLAGS);
+    compile_args.extend(["-v", &mount]);
+    compile_args.extend([IMAGE_NAME]);
+    compile_args.extend(["zapc", "src.zp", "-o", "exe"]);
+
+    let compile_result = run_and_capture(
+        Command::new("timeout")
+            .arg(format!("{TIMEOUT_SEC}s"))
+            .args(compile_args)
+    )?;
+
+    dbg!(compile_result);
 
     Ok(())
 }

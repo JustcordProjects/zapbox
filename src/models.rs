@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Copy, Clone, Debug, Serialize)]
 pub enum MessageKind {
     Stdout,
     Stderr,

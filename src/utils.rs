@@ -9,10 +9,10 @@ use crate::models::{ExecResult, MessageKind};
 
 pub fn exitcode2status(code: i32) -> Status {
     match code {
-        0   => Status::Success,
-        137 => Status::MemLimitExceeded,
-        124 => Status::TimeLimitExceeded,
-        _   => Status::UnknownError,
+        0         => Status::Success,
+        137 | 139 => Status::MemLimitExceeded,
+        124 | 152 => Status::TimeLimitExceeded,
+        _         => Status::UnknownError,
     }
 }
 

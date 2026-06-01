@@ -14,12 +14,15 @@ use std::process::{
 
 use std::io::Write;
 
-const IMAGE_NAME: &str = "zapbox-image";
+const ROOTFS_DIR: &str = "rootfs";
+const ROOTFS_URL: &str = "https://github.com/termux/proot-distro/releases/download/v4.11.0/ubuntu-noble-x86_64-pd-v4.11.0.tar.xz";
 
 const TIMEOUT_SEC: i32 = 5;
 const LIMIT_FLAGS: &[&str] = &[
-    "--net", "none",
-    "--memory", "256m",
+    "--as=1000000000",
+    "--cpu=10",
+    "--nproc=2048",
+    "--fsize=100000000",
 ];
 
 fn usage() {
@@ -29,17 +32,38 @@ fn usage() {
 usage: zapbox <command> [args...]
 commands:
     zapbox run <json-data...>    - compile and run given source code (outputs json to stdout)
-    zapbox build                 - build the podman image (with name {IMAGE_NAME})
+    zapbox setup                 - download and prepare the rootfs using proot
 "#};
 }
 
-fn build_image() -> anyhow::Result<()> {
-    let status = Command::new("podman")
-        .args(["build", "-t", IMAGE_NAME, "."])
+fn setup() -> anyhow::Result<()> {
+    if std::fs::metadata(format!("{ROOTFS_DIR}/bin/sh")).is_err() {
+        let _ = std::fs::remove_dir_all(ROOTFS_DIR);
+        let status = Command::new("sh")
+            .arg("-c")
+            .arg(format!("mkdir -p {ROOTFS_DIR} && curl -sSLf {ROOTFS_URL} | tar -xJC {ROOTFS_DIR} --strip-components=1 --exclude='dev' --exclude='proc' --exclude='sys'"))
+            .status()?;
+
+        if !status.success() {
+            let _ = std::fs::remove_dir_all(ROOTFS_DIR);
+            eprintln!("failed to download or extract rootfs");
+            proc::exit(1);
+        }
+    }
+
+    let _ = Command::new("chmod").args(["-R", "u+w", ROOTFS_DIR]).status();
+    let _ = Command::new("sh")
+        .arg("-c")
+        .arg(format!("grep -q '^staff:' {ROOTFS_DIR}/etc/group || echo 'staff:x:50:' >> {ROOTFS_DIR}/etc/group"))
+        .status();
+
+    let status = Command::new("proot")
+        .args(["-R", ROOTFS_DIR, "-0", "-b", "/dev", "-b", "/proc", "-b", "/sys"])
+        .args(["/usr/bin/sh", "-c", include_str!("setup.sh")])
         .status()?;
 
     if !status.success() {
-        eprintln!("failed to build the container image");
+        eprintln!("failed to setup rootfs dependencies");
         proc::exit(1);
     }
 
@@ -58,16 +82,21 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
         write!(stdin_file, "{}", stdin)?;
     }
 
-    let mount_arg   = format!("{}:/workspace:Z", dir.display());
+    let mount_arg   = format!("{}:/workspace", dir.display());
     let timeout_arg = format!("{TIMEOUT_SEC}s");
+
+    let proot_base: Vec<&str> = vec![
+        "proot", "-R", ROOTFS_DIR, "-0", 
+        "-b", "/dev", "-b", "/proc", "-b", "/sys", 
+        "-b", &mount_arg, "-w", "/workspace",
+    ];
 
     // i wish rust had a spread operator
     let mut compile_args: Vec<&str> = vec![];
-    compile_args.extend(["podman", "run", "--rm"]);
+    compile_args.extend(["prlimit"]);
     compile_args.extend(LIMIT_FLAGS);
-    compile_args.extend(["-v", &mount_arg]);
-    compile_args.extend([IMAGE_NAME]);
-    compile_args.extend(["zapc", "src.zp", "-o", "exe"]);
+    compile_args.extend(&proot_base);
+    compile_args.extend(["/opt/zap/zapc", "src.zp", "-o", "exe"]);
 
     let compile_result = run_and_capture(
         Command::new("timeout")
@@ -84,13 +113,12 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
     }
 
     let mut runtime_args: Vec<&str> = vec![];
-    runtime_args.extend(["podman", "run", "--rm"]);
+    runtime_args.extend(["prlimit"]);
     runtime_args.extend(LIMIT_FLAGS);
-    runtime_args.extend(["-v", &mount_arg]);
-    runtime_args.extend([IMAGE_NAME]);
+    runtime_args.extend(&proot_base);
 
     if input.stdin.is_some() {
-        runtime_args.extend(["pipe", "stdin.txt", "./exe"]);
+        runtime_args.extend(["/usr/local/bin/pipe", "stdin.txt", "./exe"]);
     } else {
         runtime_args.push("./exe");
     }
@@ -124,7 +152,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     match args[1].as_str() {
-        "build" => build_image(),
+        "setup" => setup(),
         "run"   => run(&args[2]),
         _ => {
             eprintln!("unknown command: {}", args[1]);

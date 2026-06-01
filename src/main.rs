@@ -10,7 +10,7 @@ use std::io::Write;
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        eprintln!("usage: zapc-wrapper <json-data...>");
+        eprintln!("usage: zapbox <json-data...>");
         proc::exit(1);
     }
 

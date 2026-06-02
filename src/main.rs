@@ -106,7 +106,7 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
 
     if compile_result.exitcode != 0 {
         return Ok(Output {
-            status: exitcode2status(compile_result.exitcode),
+            status: map_exitcode(compile_result.exitcode),
             compiler: compile_result,
             runtime: None,
         });
@@ -129,7 +129,7 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
     let runtime_result = run_and_capture(&mut runtime_cmd)?;
 
     Ok(Output {
-        status:   exitcode2status(runtime_result.exitcode),
+        status:   map_exitcode_ignore_unknown(runtime_result.exitcode),
         compiler: compile_result,
         runtime:  Some(runtime_result),
     })

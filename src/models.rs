@@ -24,7 +24,7 @@ pub struct Input {
     pub stdin: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub enum Status {
     #[serde(rename = "success")]
     Success,

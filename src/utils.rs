@@ -7,13 +7,18 @@ use std::thread;
 use crate::models::{Message, Status};
 use crate::models::{ExecResult, MessageKind};
 
-pub fn exitcode2status(code: i32) -> Status {
+pub fn map_exitcode(code: i32) -> Status {
     match code {
         0         => Status::Success,
         137 | 139 => Status::MemLimitExceeded,
         124 | 152 => Status::TimeLimitExceeded,
         _         => Status::UnknownError,
     }
+}
+
+pub fn map_exitcode_ignore_unknown(code: i32) -> Status {
+    let r = map_exitcode(code);
+    if r == Status::UnknownError { Status::Success } else { r }
 }
 
 fn spawn_reader<R: Read + Send + 'static>(stream: R, kind: MessageKind, sender: Sender<Message>) {

@@ -6,13 +6,13 @@ use utils::*;
 
 use std::env;
 use std::fs::File;
-
+use std::io::Write;
 use std::process::{
     self as proc,
     Command,
 };
 
-use std::io::Write;
+use spvec::spvec;
 
 const ROOTFS_DIR: &str = "rootfs";
 const ROOTFS_URL: &str = "https://github.com/termux/proot-distro/releases/download/v4.11.0/ubuntu-noble-x86_64-pd-v4.11.0.tar.xz";
@@ -91,12 +91,11 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
         "-b", &mount_arg, "-w", "/workspace",
     ];
 
-    // i wish rust had a spread operator
-    let mut compile_args: Vec<&str> = vec![];
-    compile_args.extend(["prlimit"]);
-    compile_args.extend(LIMIT_FLAGS);
-    compile_args.extend(&proot_base);
-    compile_args.extend(["/opt/zap/zapc", "src.zp", "-o", "exe"]);
+    // now we have fancy spread syntax, amazing i know
+    let compile_args: Vec<&str> = spvec![
+        "prlimit", ...LIMIT_FLAGS, ...&proot_base,
+        "/opt/zap/zapc", "src.zp", "-o", "exe",
+    ];
 
     let compile_result = run_and_capture(
         Command::new("timeout")
@@ -112,16 +111,14 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
         });
     }
 
-    let mut runtime_args: Vec<&str> = vec![];
-    runtime_args.extend(["prlimit"]);
-    runtime_args.extend(LIMIT_FLAGS);
-    runtime_args.extend(&proot_base);
-
-    if input.stdin.is_some() {
-        runtime_args.extend(["/usr/local/bin/pipe", "stdin.txt", "./exe"]);
-    } else {
-        runtime_args.push("./exe");
-    }
+    let runtime_args: Vec<&str> = spvec![
+        "prlimit", ...LIMIT_FLAGS, ...&proot_base,
+        ... if input.stdin.is_some() {
+                vec!["/usr/local/bin/pipe", "stdin.txt", "./exe"]
+            } else {
+                vec!["./exe"]
+            },
+    ];
 
     let mut runtime_cmd = Command::new("timeout");
     runtime_cmd.arg(&timeout_arg).args(runtime_args);

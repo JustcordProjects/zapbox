@@ -8,6 +8,9 @@ anyhow = "1.0.102"
 serde_json = "1.0.150"
 tempfile = "3.27.0"
 
+[dependencies.spvec]
+path = "./spvec"
+
 [dependencies.serde]
 version = "1.0.228"
 features = ["derive"]

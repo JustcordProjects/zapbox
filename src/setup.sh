@@ -4,7 +4,7 @@ set -e
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LC_ALL=C
 
-ZAP_VERSION=0.2.0
+ZAP_VERSION=0.2.1
 ZAP_URL="https://github.com/thezaplang/zap/releases/download/v$ZAP_VERSION/zap-$ZAP_VERSION-linux-x86_64.tar.gz"
 
 mkdir -p /etc/apt/apt.conf.d

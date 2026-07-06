@@ -121,8 +121,8 @@ fn do_run(input: Input) -> anyhow::Result<Output> {
             },
     ];
 
-    let mut runtime_cmd = Command::new("timeout");
-    runtime_cmd.arg(&timeout_arg).args(runtime_args);
+    let mut runtime_cmd = Command::new("unshare");
+    runtime_cmd.args([ "-n", "--", "timeout" ]).arg(&timeout_arg).args(runtime_args);
 
     let runtime_result = run_and_capture(&mut runtime_cmd)?;
 

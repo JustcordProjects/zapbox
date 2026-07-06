@@ -57,7 +57,8 @@ fn setup() -> anyhow::Result<()> {
         .arg(format!("grep -q '^staff:' {ROOTFS_DIR}/etc/group || echo 'staff:x:50:' >> {ROOTFS_DIR}/etc/group"))
         .status();
 
-    let status = Command::new("proot")
+    let status = Command::new("unshare")
+        .args(["-n", "proot"])
         .args(["-R", ROOTFS_DIR, "-0", "-b", "/dev", "-b", "/proc", "-b", "/sys"])
         .args(["/usr/bin/sh", "-c", include_str!("setup.sh")])
         .status()?;
